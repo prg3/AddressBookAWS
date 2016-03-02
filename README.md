@@ -31,6 +31,7 @@ Cron rsync command pulls the war file from the build path to the puppet root whe
 ## Puppet
 Puppet is used to push configuration and the war file to the worker nodes
 Manifests should be relatively self explanatory
+Puppet manifests need some cleanup to allow them to run to completion the first time. Issues with Nginx
 
 #AddressBook Application
 The AddressBook application is pulled from: http://www.cumulogic.com/downloads/sample-applications/
