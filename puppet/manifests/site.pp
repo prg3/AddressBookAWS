@@ -1,7 +1,7 @@
 import "classes/*"
 
 node default {
-	include default_node
+	include base
 	include tomcat
 	include oracle_java
 	class { 'nginx': }
