@@ -10,4 +10,5 @@ node default {
 		proxy => 'http://tomcat/AddressBook/'
 	}
 	include app
+	include collectd
 }
