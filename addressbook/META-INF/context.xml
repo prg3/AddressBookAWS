@@ -1,0 +1,10 @@
+<Context>
+<Resource name="jdbc/MySqlGBDS" auth="Container" type="javax.sql.DataSource"
+username="sa"
+password="mypassword"
+driverClassName="com.mysql.jdbc.Driver"
+url="jdbc:mysql://ab.cq1uipbheapz.us-west-2.rds.amazonaws.com:3306/grannydb"
+maxActive="8"
+maxIdle="4" />
+</Context>
+
