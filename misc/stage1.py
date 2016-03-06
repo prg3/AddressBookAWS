@@ -24,6 +24,10 @@ if not pubkey:
 	pubkey=fh.read()
 	fh.close()
 
+fh=open("makepuppetmaster.sh")
+userdata=fh.read()
+fh.close()
+
 # Create the connections
 ec2 = boto3.resource('ec2')
 ec2_client = boto3.client('ec2')
@@ -94,7 +98,7 @@ if not found:
 		MaxCount=1,
 		KeyName=pubkey_name,
 		SecurityGroups=['external-ssh', 'external-http'],
-		UserData="#!/bin/bash\necho foo > /tmp/foo\n",
+		UserData=userdata,
 		InstanceType='t2.micro',
 		)
 	ec2.create_tags(
