@@ -9,7 +9,7 @@ import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
 #Some configuration, leave blank for automatic
-domain="demo.majestik.org"
+domain="awstest.majestik.org"
 ami_base="ami-fce3c696" # Ubuntu 14.04 LTS - SSD
 ami_node="ami-fce3c696" #Ubuntu 14.04 Instance Store
 pubkey=None
