@@ -11,7 +11,7 @@ pp = pprint.PrettyPrinter(indent=4)
 #Some configuration, leave blank for automatic
 domain="demo.majestik.org"
 ami_base="ami-fce3c696" # Ubuntu 14.04 LTS - SSD
-ami_node="ami-80696aee" #Ubuntu 14.04 Instance Store
+ami_node="ami-fce3c696" #Ubuntu 14.04 Instance Store
 pubkey=None
 pubkey_name="Default"
 
@@ -28,10 +28,16 @@ fh=open("makepuppetmaster.sh")
 userdata=fh.read()
 fh.close()
 
+fh=open("makenode.sh")
+node_userdata=fh.read()
+fh.close()
+
 # Create the connections
 ec2 = boto3.resource('ec2')
 ec2_client = boto3.client('ec2')
 route53=boto3.client('route53')
+autoscale=boto3.client('autoscaling')
+elb = boto3.client('elb')
 
 #Find the default VPC name
 for i in ec2.vpcs.all():
@@ -97,7 +103,7 @@ if not found:
 		MinCount=1,
 		MaxCount=1,
 		KeyName=pubkey_name,
-		SecurityGroups=['external-ssh', 'external-http'],
+		SecurityGroups=['external-ssh', 'external-http', 'puppetmasters'],
 		UserData=userdata,
 		InstanceType='t2.micro',
 		)
@@ -109,11 +115,79 @@ if not found:
 	main_instance=ec2.Instance(str(instance[0].id))
 
 main_ip=main_instance.public_ip_address
+int_ip=main_instance.private_ip_address
 print ("Connect by running 'ssh ubuntu@%s'")%(main_ip)
 
+node_userdata=node_userdata.replace('PUPPETMASTERIP', int_ip)
 
-#Create Launch group
+#Register public_ip in Route53
+
 #Create ELB
+found=None
+availZones = []
+for zone in ec2_client.describe_availability_zones()['AvailabilityZones']:
+    if zone['State'] == 'available':
+        availZones.append(zone['ZoneName'])
+
+for group in ec2.security_groups.all():
+	if group.group_name == 'external-http':	
+		sg = group.group_id
+
+
+for loadbalancer in elb.describe_load_balancers()['LoadBalancerDescriptions']:
+	if loadbalancer['LoadBalancerName'] == 'workerelb':
+		found=True
+
+if not found:
+	res=elb.create_load_balancer(
+		LoadBalancerName='workerelb',
+		Listeners=[
+		{
+			'Protocol': 'HTTP',
+			'LoadBalancerPort': 80,
+			'InstanceProtocol': 'HTTP',
+			'InstancePort': 80,
+			'SSLCertificateId': 'HTTP'
+		}],
+		SecurityGroups=[ sg ],
+		AvailabilityZones=availZones
+	)
+	print "Created ELB at %s"%(res['DNSName'])
 	# Health check
-#Register ELB in Route53
-#Setup response group
+	#Register ELB in Route53
+
+#Create Launch config
+found=None
+for launchconfig in autoscale.describe_launch_configurations()['LaunchConfigurations']:
+	if launchconfig['LaunchConfigurationName'] == "workernode":
+		found=True
+		launch_config=launchconfig
+
+if not found:
+	res= autoscale.create_launch_configuration(
+		ImageId=ami_node,
+		LaunchConfigurationName='workernode',
+		KeyName=pubkey_name,
+		SecurityGroups=['internal-http'],
+		UserData=node_userdata,
+		InstanceType='t2.micro',
+		)
+	for launchconfig in autoscale.describe_launch_configurations()['LaunchConfigurations']:
+		if launchconfig['LaunchConfigurationName'] == "workernode":
+			launch_config=launchconfig
+
+#Create Autoscale Group
+found=None
+if not found:
+	res = autoscale.create_auto_scaling_group(
+		AutoScalingGroupName='workers',
+		LaunchConfigurationName='workernode',
+		MinSize=1,
+		MaxSize=1,
+		LoadBalancerNames=['workerelb'],
+		HealthCheckType='ELB',
+		AvailabilityZones=availZones,
+		HealthCheckGracePeriod=600,
+		Tags=[ {'Key': 'Master', 'Value': int_ip, 'PropagateAtLaunch': True}, {'Key':'Name', 'Value': 'worker_node', 'PropagateAtLaunch': True} ]
+	)
+		
